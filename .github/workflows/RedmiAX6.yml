@@ -61,20 +61,32 @@ jobs:
         echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
         VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
+        
+    - name: Install Feeds(安装feeds)
+      run: |
+        cd $OPENWRT_PATH
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
+        
     - name: Generate Variables(生成变量)
       run: |
-        cp $CONFIG_FILE $OPENWRT_PATH/.config
         cd $OPENWRT_PATH
+        # 先合并配置
+        cat $GITHUB_WORKSPACE/$CONFIG_FILE $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE > .config
+        # 执行一次强制修正，防止回退到 Aliyun
+        sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
+        echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
+        
         make defconfig > /dev/null 2>&1
-        SOURCE_REPO="$(echo $REPO_URL | awk -F '/' '{print $(NF)}')"
-        echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+        
         DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
         echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
         DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
         echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+        echo "SOURCE_REPO=$(echo $REPO_URL | awk -F '/' '{print $(NF)}')" >> $GITHUB_ENV
         echo "HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
-        echo "CACHE_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
+        echo "CACHE_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_EN
 
     - name: Cache Toolchain(缓存工具链)
       uses: actions/cache@main
@@ -93,11 +105,6 @@ jobs:
           done
         fi
 
-    - name: Install Feeds(安装feeds)
-      run: |
-        cd $OPENWRT_PATH
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
   
     - name: Load Custom Configuration(加载自定义配置)
       run: |
@@ -107,8 +114,10 @@ jobs:
 
     - name: Download DL Package(下载DL软件包)
       run: |
-        cat $CONFIG_FILE $GENERAL_CONFIG_FILE > $OPENWRT_PATH/.config
+        cat $GITHUB_WORKSPACE/$CONFIG_FILE $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE > $OPENWRT_PATH/.config
         cd $OPENWRT_PATH
+        # 再次确保 AX6 被选中
+        echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
         make defconfig
         make download -j$(nproc)
 
