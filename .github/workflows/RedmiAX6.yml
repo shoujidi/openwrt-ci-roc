@@ -72,35 +72,50 @@ jobs:
     - name: Generate Variables(生成变量)
       run: |
 
-        if [ -f "$CONFIG_FILE" ]; then
-            echo "找到配置文件: $CONFIG_FILE"
-        else
-            echo "错误：找不到 $CONFIG_FILE，当前目录内容如下："
-            ls -R
-            exit 1
-        fi
 
-        # 2. 将配置文件拷贝到 OpenWrt 源码目录
-        cp $GITHUB_WORKSPACE/$CONFIG_FILE $OPENWRT_PATH/.config
+        # --- 诊断环节 ---
+        echo "当前工作目录 (pwd): $(pwd)"
+        echo "仓库根目录 ($GITHUB_WORKSPACE): $GITHUB_WORKSPACE"
+        echo "期待的文件路径: $GITHUB_WORKSPACE/$CONFIG_FILE"
         
-        # 3. 切换到源码目录进行后续合并
+        # 强制检查文件是否存在
+        if [ ! -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ]; then
+          echo "❌ 错误: 找不到配置文件！"
+          echo "--- 正在列出 configs 目录下的真实文件 ---"
+          ls -R $GITHUB_WORKSPACE/configs/ || echo "configs 目录本身也不存在！"
+          exit 1
+        fi
+        
+        # --- 执行环节 ---
+        # 1. 拷贝配置文件到 OpenWrt 目录
+        cp "$GITHUB_WORKSPACE/$CONFIG_FILE" "$OPENWRT_PATH/.config"
+        
+        # 2. 进入源码目录合并 General 配置
         cd $OPENWRT_PATH
         if [ -f "$GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE" ]; then
-            cat $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE >> .config
+          cat "$GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE" >> .config
+          echo "✅ General.config 已合并"
         fi
         
-        # 4. 强制注入 Redmi AX6 标识，确保不回退到 Aliyun
+        # 3. 强制注入机型指令 (这是杀死 Aliyun 的关键)
+        # 先删除所有其他机型勾选，确保 redmi_ax6 是唯一被选中的机型
         sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
         echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
         
-        # 5. 执行 defconfig 并提取环境变量
+        # 4. 刷新配置
         make defconfig > /dev/null 2>&1
         
-        echo "DEVICE_TARGET=$(grep CONFIG_TARGET_BOARD .config | cut -d'=' -f2 | tr -d '\"')" >> $GITHUB_ENV
-        echo "DEVICE_SUBTARGET=$(grep CONFIG_TARGET_SUBTARGET .config | cut -d'=' -f2 | tr -d '\"')" >> $GITHUB_ENV
-        echo "SOURCE_REPO=$(echo $REPO_URL | awk -F '/' '{print $(NF)}')" >> $GITHUB_ENV
+        # --- 变量锁定环节 ---
+        # 提取真正的 Target 变量，确保后面打包路径正确
+        DT=$(grep CONFIG_TARGET_BOARD .config | cut -d'"' -f2)
+        DS=$(grep CONFIG_TARGET_SUBTARGET .config | cut -d'"' -f2)
+        echo "DEVICE_TARGET=$DT" >> $GITHUB_ENV
+        echo "DEVICE_SUBTARGET=$DS" >> $GITHUB_ENV
+        echo "SOURCE_REPO=$(echo $REPO_URL | awk -F '/' '{print $NF}')" >> $GITHUB_ENV
         echo "HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
         echo "CACHE_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
+        
+        echo "🚀 最终确定的编译目标: $DT / $DS"
 
     - name: Cache Toolchain(缓存工具链)
       uses: actions/cache@main
