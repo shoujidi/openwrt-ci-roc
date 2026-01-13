@@ -71,9 +71,12 @@ jobs:
         
     - name: Generate Variables(生成变量)
       run: |
+        cp $GITHUB_WORKSPACE/$CONFIG_FILE $OPENWRT_PATH/.config
+        
+        # 然后再进入源码目录进行操作
         cd $OPENWRT_PATH
-        # 先合并配置
-        cat $GITHUB_WORKSPACE/$CONFIG_FILE $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE > $OPENWRT_PATH/.config
+        # 如果有通用配置，追加进去
+        cat $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE >> .config
         
         # 执行一次强制修正，防止回退到 Aliyun
         sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
