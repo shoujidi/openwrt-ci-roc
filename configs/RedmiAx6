@@ -1,0 +1,16 @@
+# 基础架构定义
+CONFIG_TARGET_qualcommax=y
+CONFIG_TARGET_qualcommax_ipq807x=y
+
+# 核心：锁定红米 AX6 (必须是这个名字)
+CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y
+
+# 明确禁用 stock 分区布局（因为你想要大分区版）
+# CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6-stock is not set
+
+# 必须禁用多机型构建，强制编译器只看上面选中的那一个
+CONFIG_TARGET_MULTI_PROFILE=n
+
+# 4. 你的优化参数（保留）
+CONFIG_ATH11K_MEM_PROFILE_512M=y
+CONFIG_NSS_FIRMWARE_VERSION_11_4=y
