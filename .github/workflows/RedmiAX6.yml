@@ -1,4 +1,4 @@
-name: RedmiAX6-LibWrt
+name: RedmiAX6
 
 on:
   workflow_dispatch:
@@ -62,60 +62,21 @@ jobs:
         VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)
         echo "VERSION_KERNEL=$VERSION_KERNEL" >> $GITHUB_ENV
         
-    - name: Install Feeds(安装feeds)
-      run: |
-        cd $OPENWRT_PATH
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
 
         
     - name: Generate Variables(生成变量)
       run: |
-
-
-        # --- 诊断环节 ---
-        echo "当前工作目录 (pwd): $(pwd)"
-        echo "仓库根目录 ($GITHUB_WORKSPACE): $GITHUB_WORKSPACE"
-        echo "期待的文件路径: $GITHUB_WORKSPACE/$CONFIG_FILE"
-        
-        # 强制检查文件是否存在
-        if [ ! -f "$GITHUB_WORKSPACE/$CONFIG_FILE" ]; then
-          echo "❌ 错误: 找不到配置文件！"
-          echo "--- 正在列出 configs 目录下的真实文件 ---"
-          ls -R $GITHUB_WORKSPACE/configs/ || echo "configs 目录本身也不存在！"
-          exit 1
-        fi
-        
-        # --- 执行环节 ---
-        # 1. 拷贝配置文件到 OpenWrt 目录
-        cp "$GITHUB_WORKSPACE/$CONFIG_FILE" "$OPENWRT_PATH/.config"
-        
-        # 2. 进入源码目录合并 General 配置
+        cp $CONFIG_FILE $OPENWRT_PATH/.config
         cd $OPENWRT_PATH
-        if [ -f "$GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE" ]; then
-          cat "$GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE" >> .config
-          echo "✅ General.config 已合并"
-        fi
-        
-        # 3. 强制注入机型指令 (这是杀死 Aliyun 的关键)
-        # 先删除所有其他机型勾选，确保 redmi_ax6 是唯一被选中的机型
-        sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
-        echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
-        
-        # 4. 刷新配置
         make defconfig > /dev/null 2>&1
-        
-        # --- 变量锁定环节 ---
-        # 提取真正的 Target 变量，确保后面打包路径正确
-        DT=$(grep CONFIG_TARGET_BOARD .config | cut -d'"' -f2)
-        DS=$(grep CONFIG_TARGET_SUBTARGET .config | cut -d'"' -f2)
-        echo "DEVICE_TARGET=$DT" >> $GITHUB_ENV
-        echo "DEVICE_SUBTARGET=$DS" >> $GITHUB_ENV
-        echo "SOURCE_REPO=$(echo $REPO_URL | awk -F '/' '{print $NF}')" >> $GITHUB_ENV
+        SOURCE_REPO="$(echo $REPO_URL | awk -F '/' '{print $(NF)}')"
+        echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+        DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
+        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
+        DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
+        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
         echo "HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
         echo "CACHE_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
-        
-        echo "🚀 最终确定的编译目标: $DT / $DS"
 
     - name: Cache Toolchain(缓存工具链)
       uses: actions/cache@main
@@ -134,7 +95,12 @@ jobs:
           done
         fi
 
-  
+    - name: Install Feeds(安装feeds)
+      run: |
+        cd $OPENWRT_PATH
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
     - name: Load Custom Configuration(加载自定义配置)
       run: |
         chmod +x $DIY_SCRIPT
