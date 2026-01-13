@@ -1,4 +1,4 @@
-name: IPQ807X-LibWrt
+name: RedmiAX6
 
 on:
   workflow_dispatch:
