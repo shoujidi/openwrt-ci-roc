@@ -74,6 +74,7 @@ jobs:
         cd $OPENWRT_PATH
         # 先合并配置
         cat $GITHUB_WORKSPACE/$CONFIG_FILE $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE > $OPENWRT_PATH/.config
+        
         # 执行一次强制修正，防止回退到 Aliyun
         sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
         echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
