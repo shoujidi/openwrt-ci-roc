@@ -106,3 +106,9 @@ echo "baidu.com" > package/luci-app-passwall/luci-app-passwall/root/usr/share/pa
 # --- 5. 刷新 Feeds 并安装 ---
 ./scripts/feeds update -a
 ./scripts/feeds install -a
+# 物理删除导致循环依赖的罪魁祸首
+rm -rf package/feeds/packages/iptasn
+rm -rf package/feeds/packages/perl
+# 同时建议删除 SQM-NSS 插件，因为它也是循环链条的一环
+rm -rf package/feeds/nss_packages/sqm-scripts-nss
+
