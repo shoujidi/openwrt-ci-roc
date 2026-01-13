@@ -71,23 +71,33 @@ jobs:
         
     - name: Generate Variables(生成变量)
       run: |
+
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "找到配置文件: $CONFIG_FILE"
+        else
+            echo "错误：找不到 $CONFIG_FILE，当前目录内容如下："
+            ls -R
+            exit 1
+        fi
+
+        # 2. 将配置文件拷贝到 OpenWrt 源码目录
         cp $GITHUB_WORKSPACE/$CONFIG_FILE $OPENWRT_PATH/.config
         
-        # 然后再进入源码目录进行操作
+        # 3. 切换到源码目录进行后续合并
         cd $OPENWRT_PATH
-        # 如果有通用配置，追加进去
-        cat $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE >> .config
+        if [ -f "$GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE" ]; then
+            cat $GITHUB_WORKSPACE/$GENERAL_CONFIG_FILE >> .config
+        fi
         
-        # 执行一次强制修正，防止回退到 Aliyun
+        # 4. 强制注入 Redmi AX6 标识，确保不回退到 Aliyun
         sed -i '/CONFIG_TARGET_DEVICE_qualcommax_ipq807x_DEVICE_/d' .config
         echo "CONFIG_TARGET_qualcommax_ipq807x_DEVICE_redmi_ax6=y" >> .config
         
+        # 5. 执行 defconfig 并提取环境变量
         make defconfig > /dev/null 2>&1
         
-        DEVICE_TARGET=$(cat .config | grep CONFIG_TARGET_BOARD | awk -F '"' '{print $2}')
-        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
-        DEVICE_SUBTARGET=$(cat .config | grep CONFIG_TARGET_SUBTARGET | awk -F '"' '{print $2}')
-        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
+        echo "DEVICE_TARGET=$(grep CONFIG_TARGET_BOARD .config | cut -d'=' -f2 | tr -d '\"')" >> $GITHUB_ENV
+        echo "DEVICE_SUBTARGET=$(grep CONFIG_TARGET_SUBTARGET .config | cut -d'=' -f2 | tr -d '\"')" >> $GITHUB_ENV
         echo "SOURCE_REPO=$(echo $REPO_URL | awk -F '/' '{print $(NF)}')" >> $GITHUB_ENV
         echo "HASH=$(git log -1 --pretty=format:'%h')" >> $GITHUB_ENV
         echo "CACHE_DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
