@@ -80,6 +80,9 @@ git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages packa
 # 移除 OpenWrt Feeds 过时的LuCI版本
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-openclash
+rm -rf package/passwall-packages/xray-core
+git clone --depth=1 https://github.com/XTLS/Xray-core package/passwall-packages/xray-core
+
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall package/luci-app-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall2 package/luci-app-passwall2
 git clone --depth=1 https://github.com/vernesong/OpenClash package/luci-app-openclash
